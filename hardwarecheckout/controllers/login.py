@@ -18,8 +18,7 @@ from flask import (
 
 @app.route('/login')
 def login_page():
-    mlh = MLHSignIn()
-    return mlh.authorize()
+    return MLHSignIn().authorize()
 
 @app.route('/callback/mlh')
 def oauth_callback():
@@ -27,20 +26,21 @@ def oauth_callback():
         token = verify_token(request.cookies['jwt'])
         if token is not None:
             return redirect('/inventory')
-    mlh = MLHSignIn()
-    id_, email = mlh.callback()
-    if id_ is None:
+
+    mlh_user = MLHSignIn().callback()
+
+    if mlh_user is None or mlh_user.id is None:
         flash('Authentication failed.')
         return redirect('/inventory')
-    if User.query.filter_by(email=email).count() == 0:
+
+    if User.query.filter_by(email=mlh_user.email).count() == 0:
         admin = email in config.ADMINS
         user = User(email, admin)
         db.session.add(user)
         db.session.commit()
 
     # generate token since we cut out quill
-    token = generate_auth_token(email)
-
+    token = generate_auth_token(mlh_user.email)
     response = app.make_response(redirect('/inventory'))
     response.set_cookie('jwt', token.encode('utf-8'))
 
